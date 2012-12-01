@@ -32,6 +32,8 @@
 
 #include <qtopiaapplication.h>
 #include <QObject>
+#include <Qtopia>
+#include <QtopiaApplication>
 #include "SDL_timer.h"
 #include "SDL_QWin.h"
 
@@ -192,8 +194,17 @@ extern "C" {
 
     return(0);
   }
+  
+  QtopiaApplication *app;
 
   int QT_VideoInit(_THIS, SDL_PixelFormat *vformat) {
+      
+      int argc = 1;
+      char *argv[1];
+      argv[0] = strdup("sdlapp"); 
+      app = new QtopiaApplication( argc, argv );
+      printf("QT_VideoInit\n");
+      
     /* Initialize the EzX Application  */
     /* Determine the screen depth */
     vformat->BitsPerPixel = 16; 
