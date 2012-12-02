@@ -207,12 +207,12 @@ extern "C" {
       
     /* Initialize the EzX Application  */
     /* Determine the screen depth */
-    vformat->BitsPerPixel = 16; 
+    vformat->BitsPerPixel = 32; 
 
     // For now we hardcode the current depth because anything else
     // might as well be emulated by SDL rather than by EzX.
 
-    QSize desktop_size(240, 320);// = qApp->desktop()->size();
+    QSize desktop_size(480, 640);// = qApp->desktop()->size();
     QT_AddMode(_this, ((vformat->BitsPerPixel+7)/8)-1,
                desktop_size.width(), desktop_size.height());
     QT_AddMode(_this, ((vformat->BitsPerPixel+7)/8)-1,
@@ -235,11 +235,11 @@ extern "C" {
     struct fb_var_screeninfo fbi;
     Uint32 r = 0, g = 0, b = 0, a = 0;
 
-    fbi.red.length = 5;
-    fbi.red.offset = 11;
-    fbi.green.length = 6;
-    fbi.green.offset = 5;
-    fbi.blue.length = 5;
+    fbi.red.length = 8;
+    fbi.red.offset = 16;
+    fbi.green.length = 8;
+    fbi.green.offset = 8;
+    fbi.blue.length = 8;
     fbi.blue.offset = 0;
     fbi.transp.length = 0;
     fbi.transp.offset = 0;
@@ -314,7 +314,7 @@ extern "C" {
   SDL_Surface *QT_SetVideoMode(_THIS, SDL_Surface *current,
                                int width, int height, int bpp, Uint32 flags) {
     QImage *qimage;
-    QSize desktop_size(240, 320);// = qApp->desktop()->size();
+    QSize desktop_size(480, 640);// = qApp->desktop()->size();
 
     current->flags = 0; //SDL_FULLSCREEN; // We always run fullscreen.
     SDL_QWin::Rotation rotation = SDL_QWin::NoRotation;
@@ -340,7 +340,7 @@ extern "C" {
       return(NULL);
     }
     /* Create the QImage framebuffer */
-    qimage = new QImage(current->w, current->h, QImage::Format_RGB16);
+    qimage = new QImage(current->w, current->h, QImage::Format_RGB32);
     if (qimage->isNull()) {
       SDL_SetError("Couldn't create screen bitmap");
       delete qimage;

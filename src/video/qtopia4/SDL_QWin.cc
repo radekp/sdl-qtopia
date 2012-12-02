@@ -146,7 +146,7 @@ void SDL_QWin::flushRegion(const QRegion &region) {
     /* next - special for 18bpp framebuffer */
     /* so any other - back off */
 
-#if 1 // Disable rotation for now
+#if 0 // Disable rotation for now
     // 18 bpp - really 3 bytes per pixel
     if (rotationMode==Clockwise) {
       QRect rs = backBuffer->rect();
@@ -243,22 +243,26 @@ void SDL_QWin::flushRegion(const QRegion &region) {
       uchar *src0 = backBuffer->bits();
       uchar *dst0 = vmem;
       uchar *dst, *src;
-
+      
+      int fbstep = QDirectPainter::linestep();
+      int bypp = QDirectPainter::screenDepth() / 8;
       int is_lim = rect.y() + rect.height();
       int s_offset = rect.y() * backBuffer->bytesPerLine() + rect.x() * 2;
-      int offset = rect.y() * 720 + rect.x() * 3;
+      int offset = rect.y() * fbstep + rect.x() * bypp;
+      
+      qDebug() << "fbstep=" << fbstep << ", bypp=" << bypp;
 
-      for (int ii = rect.y(); ii < is_lim; ii++, offset += 720,
+      for (int ii = rect.y(); ii < is_lim; ii++, offset += fbstep,
            s_offset += backBuffer->bytesPerLine()) {
         dst = dst0 + offset;
         src = src0 + s_offset;
         for (int j = 0; j < rect.width(); j++) {
-          unsigned short tmp = ((unsigned short)(src[1] & 0xf8)) << 2;
-          dst[0] = src[0] << 1;
-          dst[1] = ((src[0] & 0x80) >> 7) | ((src[1] & 0x7) << 1) | (tmp & 0xff);
-          dst[2] = (tmp & 0x300) >> 8;
-          src += 2;
-          dst += 3;
+            dst[0] = src[0];         // B
+            dst[1] = src[1];       // G
+            dst[2] = src[2];       // R
+            dst[3] = 0;
+            src += 4;
+            dst += 4;
         }
       }
     }
