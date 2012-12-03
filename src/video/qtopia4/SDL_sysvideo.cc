@@ -33,6 +33,9 @@
 #include <qtopiaapplication.h>
 #include <QObject>
 #include <Qtopia>
+#include <QMenu>
+#include <QSoftMenuBar>
+#include <QDesktopWidget>
 #include <QtopiaApplication>
 #include "SDL_timer.h"
 #include "SDL_QWin.h"
@@ -212,7 +215,7 @@ extern "C" {
     // For now we hardcode the current depth because anything else
     // might as well be emulated by SDL rather than by EzX.
 
-    QSize desktop_size(480, 640);// = qApp->desktop()->size();
+    QSize desktop_size = QSize(480, 640);//qApp->desktop()->size();
     QT_AddMode(_this, ((vformat->BitsPerPixel+7)/8)-1,
                desktop_size.width(), desktop_size.height());
     QT_AddMode(_this, ((vformat->BitsPerPixel+7)/8)-1,
@@ -225,9 +228,11 @@ extern "C" {
     /* Create the window / widget */
     SDL_Win = new SDL_QWin();
     QtopiaApplication::instance()->setMainWidget(SDL_Win);
-    SDL_Win->setWindowTitle(QLatin1String("_allow_on_top_"));
-    SDL_Win->showFullScreen();
-    SDL_Win->setWindowTitle(QLatin1String("SDL"));
+    SDL_Win->setGeometry(0, 200, 200, 200);
+    SDL_Win->showOnFullScreen();
+    
+    QMenu *menu = QSoftMenuBar::menuFor(SDL_Win);
+    menu->addAction("Launch", SDL_Win, SLOT(showOnFullScreen()));
 
     /* Fill in some window manager capabilities */
     _this->info.wm_available = 0;
@@ -314,7 +319,7 @@ extern "C" {
   SDL_Surface *QT_SetVideoMode(_THIS, SDL_Surface *current,
                                int width, int height, int bpp, Uint32 flags) {
     QImage *qimage;
-    QSize desktop_size(480, 640);// = qApp->desktop()->size();
+    QSize desktop_size = QSize(480, 640);// qApp->desktop()->size();
 
     current->flags = 0; //SDL_FULLSCREEN; // We always run fullscreen.
     SDL_QWin::Rotation rotation = SDL_QWin::NoRotation;
@@ -329,7 +334,7 @@ extern "C" {
       printf("landscape mode\n");
       char * envString = SDL_getenv(SDL_QT_ROTATION_ENV_NAME);
       int envValue = envString ? atoi(envString) : 0;
-      rotation = envValue ? SDL_QWin::CounterClockwise : SDL_QWin::Clockwise;
+      //rotation = envValue ? SDL_QWin::CounterClockwise : SDL_QWin::Clockwise;
       current->h = desktop_size.width();
       current->w = desktop_size.height();
     } else {
@@ -390,7 +395,7 @@ extern "C" {
     QRegion region;
     for (int i=0; i<numrects; ++i )
       region += QRect(rects[i].x, rects[i].y, rects[i].w, rects[i].h);
-    SDL_Win->flushRegion(region);
+    SDL_Win->update(region);
   }
   /* Is the system palette settable? */
   int QT_SetColors(_THIS, int firstcolor, int ncolors, SDL_Color *colors) {

@@ -26,6 +26,7 @@
 
 #include <QImage>
 #include <QWidget>
+#include <QMainWindow>
 #include <QDirectPainter>
 #include <QMatrix>
 
@@ -35,7 +36,7 @@ extern "C" {
 #include "../../events/SDL_events_c.h"
 };
 
-class SDL_QWin : public QWidget {
+class SDL_QWin : public QMainWindow {
   Q_OBJECT
 public:
   enum Rotation
@@ -64,8 +65,12 @@ public:
     return mousePosition;
   }
 
+public slots:
+   void showOnFullScreen();
+
 protected:
   /* Handle resizing of the window */
+  bool event(QEvent *event);
   void showEvent(QShowEvent *e);
   void closeEvent(QCloseEvent *e);
   void mouseMoveEvent(QMouseEvent *e);

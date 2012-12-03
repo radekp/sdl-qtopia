@@ -35,16 +35,16 @@
 #include <stdlib.h>
 
 #include <QObject>
+#include <QPainter>
 #include <QPaintEvent>
 #include <QScreen>
 #include <QDesktopWidget>
-#include <QDirectPainter>
 #include <QApplication>
 
 #include <QtDebug>
 
 SDL_QWin::SDL_QWin(QWidget * parent, Qt::WindowFlags f)
-  : QWidget(parent, f), 
+  : QMainWindow(parent, f), 
   rotationMode(NoRotation), backBuffer(NULL), useRightMouseButton(false)
 {
   painter = new QDirectPainter(this, QDirectPainter::Reserved); 
@@ -58,8 +58,10 @@ SDL_QWin::~SDL_QWin() {
 }
 
 void SDL_QWin::setBackBuffer(SDL_QWin::Rotation new_rotation, QImage *new_buffer) {
-  int w = QDirectPainter::screenWidth();
-  int h = QDirectPainter::screenHeight();
+  //int w = QDirectPainter::screenWidth();
+  //int h = QDirectPainter::screenHeight();
+  int w = 480;
+  int h = 640;
   rotationMode = new_rotation;
   switch (rotationMode) {
     case NoRotation:
@@ -80,6 +82,33 @@ void SDL_QWin::setBackBuffer(SDL_QWin::Rotation new_rotation, QImage *new_buffer
   toScreen = toSDL.inverted();
   delete backBuffer;
   backBuffer = new_buffer;
+}
+
+void SDL_QWin::showOnFullScreen()
+{
+    qDebug() << "showOnFullScreen()";
+    // Show in full screen
+    showMaximized();
+    setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
+    setWindowState(Qt::WindowFullScreen);
+    raise();
+}
+
+bool SDL_QWin::event(QEvent *event)
+{
+    // Needed for QtMoko fullscreen
+    if(event->type() == QEvent::WindowDeactivate)
+    {
+        lower();
+    }
+    else if(event->type() == QEvent::WindowActivate)
+    {
+        QString title = windowTitle();
+        setWindowTitle(QLatin1String("_allow_on_top_"));
+        raise();
+        setWindowTitle(title);
+    }
+    return QWidget::event(event);
 }
 
 /**
@@ -273,8 +302,14 @@ void SDL_QWin::flushRegion(const QRegion &region) {
 
 // This paints the current buffer to the screen, when desired.
 void SDL_QWin::paintEvent(QPaintEvent *ev) {
-  if(backBuffer) 
-    flushRegion(toSDL.map(QRegion(ev->rect())));
+    //QPainter p(this);
+    //if(backBuffer)
+        //p.drawImage(0, 0, *backBuffer);
+
+        qDebug() << "paintEvent";
+        
+    if(backBuffer) 
+      flushRegion(toSDL.map(QRegion(ev->rect())));
 }
 
 void SDL_QWin::keyEvent(bool pressed, QKeyEvent *e) {
