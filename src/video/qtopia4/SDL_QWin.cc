@@ -172,7 +172,7 @@ void SDL_QWin::flushRegion(const QRegion &region) {
     
     if(keyboardShown) {
         QPainter p(this);
-        p.drawImage(x(), y(), *backBuffer);
+        p.drawImage(geometry(), *backBuffer, backBuffer->rect());
         return;
     }
     
