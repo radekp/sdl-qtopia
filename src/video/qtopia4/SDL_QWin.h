@@ -85,16 +85,8 @@ private:
   void suspend();
   void resume();
 
-  uchar *vmem; // FIXME: no need to store it (use QDirectPainter::framebuffer instead)
-  QDirectPainter *painter;
   QImage *backBuffer;
-
-  /**
-   * Matrices to transform coordinates between SDL and screen systems.
-   */
   Rotation rotationMode;
-  QMatrix toSDL;
-  QMatrix toScreen;
 
   /**
    * When modifier key is pressed, treat left mouse button as right.

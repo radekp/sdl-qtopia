@@ -40,6 +40,7 @@
 #include <QScreen>
 #include <QDesktopWidget>
 #include <QApplication>
+#include <QtopiaApplication>
 
 #include <QtDebug>
 
@@ -47,10 +48,8 @@ SDL_QWin::SDL_QWin(QWidget * parent, Qt::WindowFlags f)
   : QMainWindow(parent, f), 
   rotationMode(NoRotation), backBuffer(NULL), useRightMouseButton(false)
 {
-  painter = new QDirectPainter(this, QDirectPainter::Reserved); 
-  painter->setGeometry(QApplication::desktop()->screenGeometry());
-    // TODO: Find out how to avoid reserving the whole screen
-  vmem = QDirectPainter::frameBuffer();
+  setAttribute(Qt::WA_NoSystemBackground);
+  setAttribute(Qt::WA_OpaquePaintEvent);
 }
 
 SDL_QWin::~SDL_QWin() {
@@ -58,36 +57,15 @@ SDL_QWin::~SDL_QWin() {
 }
 
 void SDL_QWin::setBackBuffer(SDL_QWin::Rotation new_rotation, QImage *new_buffer) {
-  //int w = QDirectPainter::screenWidth();
-  //int h = QDirectPainter::screenHeight();
-  int w = 480;
-  int h = 640;
   rotationMode = new_rotation;
-  switch (rotationMode) {
-    case NoRotation:
-      toSDL = QMatrix(); // No conversion actually => use identity matrix
-      break;
-    case Clockwise:
-      toSDL = QMatrix(
-           0, 1, 
-          -1, 0,
-         h-1, 0);
-      break;
-    case CounterClockwise:
-      toSDL = QMatrix(
-        0,  -1,
-        1,   0,
-        0, w-1);
-  }      
-  toScreen = toSDL.inverted();
   delete backBuffer;
   backBuffer = new_buffer;
 }
 
+
+// Show widget in full screen
 void SDL_QWin::showOnFullScreen()
 {
-    qDebug() << "showOnFullScreen()";
-    // Show in full screen
     showMaximized();
     setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
     setWindowState(Qt::WindowFullScreen);
@@ -146,7 +124,7 @@ void SDL_QWin::mouseMoveEvent(QMouseEvent *e) {
     sdlstate |= SDL_BUTTON_RMASK;
   }
   
-  mousePosition = toSDL.map(e->globalPos());
+  mousePosition = e->globalPos();
   SDL_PrivateMouseMotion(sdlstate, 0, mousePosition.x(), mousePosition.y());
 }
 
@@ -157,222 +135,287 @@ void SDL_QWin::mousePressEvent(QMouseEvent *e) {
   else
     pressedButton = e->button();
 
-  mousePosition = toSDL.map(e->globalPos());
+  mousePosition = e->globalPos();
   SDL_PrivateMouseButton(SDL_PRESSED, (pressedButton==Qt::LeftButton)?SDL_BUTTON_LEFT:SDL_BUTTON_RIGHT,
      mousePosition.x(), mousePosition.y());
 }
 
 void SDL_QWin::mouseReleaseEvent(QMouseEvent *e) {
-  mousePosition = toSDL.map(e->globalPos());
+  mousePosition = e->globalPos();
   SDL_PrivateMouseButton(SDL_RELEASED, (pressedButton==Qt::LeftButton)?SDL_BUTTON_LEFT:SDL_BUTTON_RIGHT,
      mousePosition.x(), mousePosition.y());
 }
 
 void SDL_QWin::flushRegion(const QRegion &region) {
-  painter->startPainting();
-
-  foreach(const QRect &rect, region.rects()) {
-    /* next - special for 18bpp framebuffer */
-    /* so any other - back off */
-
-#if 0 // Disable rotation for now
-    // 18 bpp - really 3 bytes per pixel
-    if (rotationMode==Clockwise) {
-      QRect rs = backBuffer->rect();
-      QRect rd;
-
-      int id, jd;
-
-      if (rect.y() + rect.height() > 240) {
-        rs.setRect(rect.y(), 240 - rect.width() - rect.x(), rect.height(), rect.width());
-        rd = rect;
-        jd = rect.y() + rect.height() - 1;
-        id = rect.x();
-      } else {
-        rs = rect;
-        rd.setRect(rect.y(), 320 - rect.width() - rect.x(), rect.height(), rect.width());
-        jd = 319 - rect.x();
-        id = rect.y();
-      }
-
-      //printf("rs: %d %d %d %d\n", rs.x(), rs.y(), rs.width(), rs.height());
-      //printf("rd: %d %d %d %d\n", rd.x(), rd.y(), rd.width(), rd.height());
-      //printf("id: %d, jd: %d\n", id, jd);
-
-      int ii = id, jj;
-      uchar *src0 = backBuffer->bits();
-      uchar *dst0 = vmem;
-      uchar *dst, *src;
-
-      src += rs.y() * backBuffer->bytesPerLine() + rs.x() * 2;
-
-      int is_lim = rs.y() + rs.height();
-      int dst_offset = jd * 720 + id * 3;
-      int src_offset = rs.y() * backBuffer->bytesPerLine() + rs.x() * 2;
-
-      for (int ii = rs.y(); ii < is_lim;
-           dst_offset += 3, src_offset += backBuffer->bytesPerLine(), ii++) {
-        dst = dst0 + dst_offset;
-        src = src0 + src_offset;
-        for (int j = 0; j < rs.width(); j++) {
-          unsigned short tmp = ((unsigned short)(src[1] & 0xf8)) << 2;
-          dst[0] = src[0] << 1;
-          dst[1] = ((src[0] & 0x80) >> 7) | ((src[1] & 0x7) << 1) | (tmp & 0xff);
-          dst[2] = (tmp & 0x300) >> 8;
-          dst -= 720;
-          src += 2;
-        }
-      }
-      //printf("done\n");
-    } else if (rotationMode==CounterClockwise) {
-      QRect rs = backBuffer->rect();
-      QRect rd;
-
-      int id, jd;
-
-      if (rect.y() + rect.height() > 240) {
-        rs.setRect(rect.y(), 240 - rect.width() - rect.x(), rect.height(), rect.width());
-        rd = rect;
-        jd = rect.y();
-        id = rect.x() + rect.width() - 1;
-      } else {
-        rs = rect;
-        rd.setRect(rect.y(), 320 - rect.width() - rect.x(), rect.height(), rect.width());
-        jd = rect.x();
-        id = 239 - rect.y();
-      }
-
-      int ii = id, jj;
-      uchar *src0 = backBuffer->bits();
-      uchar *dst0 = vmem;
-      uchar *dst, *src;
-
-      src += rs.y() * backBuffer->bytesPerLine() + rs.x() * 2;
-
-      int is_lim = rs.y() + rs.height();
-      int dst_offset = jd * 720 + id * 3;
-      int src_offset = rs.y() * backBuffer->bytesPerLine() + rs.x() * 2;
-
-      for (int ii = rs.y(); ii < is_lim;
-           dst_offset -= 3, src_offset += backBuffer->bytesPerLine(), ii++) {
-        dst = dst0 + dst_offset;
-        src = src0 + src_offset;
-        for (int j = 0; j < rs.width(); j++) {
-          unsigned short tmp = ((unsigned short)(src[1] & 0xf8)) << 2;
-          dst[0] = src[0] << 1;
-          dst[1] = ((src[0] & 0x80) >> 7) | ((src[1] & 0x7) << 1) | (tmp & 0xff);
-          dst[2] = (tmp & 0x300) >> 8;
-          dst += 720;
-          src += 2;
-        }
-      }
-    } else
-#endif
-    {
-      uchar *src0 = backBuffer->bits();
-      uchar *dst0 = vmem;
-      uchar *dst, *src;
-      
-      int fbstep = QDirectPainter::linestep();
-      int bypp = QDirectPainter::screenDepth() / 8;
-      int is_lim = rect.y() + rect.height();
-      int s_offset = rect.y() * backBuffer->bytesPerLine() + rect.x() * 2;
-      int offset = rect.y() * fbstep + rect.x() * bypp;
-      
-      qDebug() << "fbstep=" << fbstep << ", bypp=" << bypp;
-
-      for (int ii = rect.y(); ii < is_lim; ii++, offset += fbstep,
-           s_offset += backBuffer->bytesPerLine()) {
-        dst = dst0 + offset;
-        src = src0 + s_offset;
-        for (int j = 0; j < rect.width(); j++) {
-            dst[0] = src[0];         // B
-            dst[1] = src[1];       // G
-            dst[2] = src[2];       // R
-            dst[3] = 0;
-            src += 4;
-            dst += 4;
-        }
-      }
-    }
-  }
-
-  painter->endPainting(toScreen.map(region));
+        
+    if(backBuffer)
+        QScreen::instance()->blit(*backBuffer, QPoint(0,0), QRegion(0, 0, 640, 480));
 }
 
 // This paints the current buffer to the screen, when desired.
-void SDL_QWin::paintEvent(QPaintEvent *ev) {
-    //QPainter p(this);
-    //if(backBuffer)
-        //p.drawImage(0, 0, *backBuffer);
+void SDL_QWin::paintEvent(QPaintEvent *ev)
+{
+    flushRegion(QRegion(ev->rect()));
+}
 
-        qDebug() << "paintEvent";
-        
-    if(backBuffer) 
-      flushRegion(toSDL.map(QRegion(ev->rect())));
+static SDLMod qToSDLMod(Qt::KeyboardModifiers qmod)
+{
+    switch(qmod)
+    {
+        case Qt::ShiftModifier:
+            return (SDLMod)(KMOD_SHIFT);
+        case Qt::ControlModifier:
+            return (SDLMod)(KMOD_CTRL);
+        case Qt::AltModifier:
+            return (SDLMod)(KMOD_ALT);
+        case Qt::MetaModifier:
+            return (SDLMod)(KMOD_META);
+        case Qt::KeypadModifier:
+            return KMOD_NUM;
+        default:
+            return KMOD_NONE;
+    }
+}
+
+static SDLKey qToSDLKey(int qkey, QString qtext)
+{
+    switch(qkey) {
+        case Qt::Key_Backspace:
+            return SDLK_BACKSPACE;
+        case Qt::Key_Tab:
+            return SDLK_TAB;
+        case Qt::Key_Clear:
+            return SDLK_CLEAR;
+        case Qt::Key_Return:
+            return SDLK_RETURN;
+        case Qt::Key_Pause:
+            return SDLK_PAUSE;
+        case Qt::Key_Escape:
+            return SDLK_ESCAPE;
+        case Qt::Key_Space:
+            return SDLK_SPACE;
+        case Qt::Key_Exclam:
+            return SDLK_EXCLAIM;
+        case Qt::Key_QuoteDbl:
+            return SDLK_QUOTEDBL;
+        case Qt::Key_Dollar:
+            return SDLK_DOLLAR;
+        case Qt::Key_Ampersand:
+            return SDLK_AMPERSAND;
+        case Qt::Key_QuoteLeft:
+            return SDLK_QUOTE;
+        case Qt::Key_ParenLeft:
+            return SDLK_LEFTPAREN;
+        case Qt::Key_ParenRight:
+            return SDLK_RIGHTPAREN;
+        case Qt::Key_Asterisk:
+            return SDLK_ASTERISK;
+        case Qt::Key_Plus:
+            return SDLK_PLUS;
+        case Qt::Key_Comma:
+            return SDLK_COMMA;
+        case Qt::Key_Minus:
+            return SDLK_MINUS;
+        case Qt::Key_Period:
+            return SDLK_PERIOD;
+        case Qt::Key_Slash:
+            return SDLK_SLASH;
+        case Qt::Key_0:
+            return SDLK_0;
+        case Qt::Key_1:
+            return SDLK_1;
+        case Qt::Key_2:
+            return SDLK_2;
+        case Qt::Key_3:
+            return SDLK_3;
+        case Qt::Key_4:
+            return SDLK_4;
+        case Qt::Key_5:
+            return SDLK_5;
+        case Qt::Key_6:
+            return SDLK_6;
+        case Qt::Key_7:
+            return SDLK_7;
+        case Qt::Key_8:
+            return SDLK_8;
+        case Qt::Key_9:
+            return SDLK_9;
+        case Qt::Key_Colon:
+            return SDLK_COLON;
+        case Qt::Key_Semicolon:
+            return SDLK_SEMICOLON;
+        case Qt::Key_Less:
+            return SDLK_LESS;
+        case Qt::Key_Equal:
+            return SDLK_EQUALS;
+        case Qt::Key_Greater:
+            return SDLK_GREATER;
+        case Qt::Key_Question:
+            return SDLK_QUESTION;
+        case Qt::Key_At:
+            return SDLK_AT;
+        case Qt::Key_BracketLeft:
+            return SDLK_LEFTBRACKET;
+        case Qt::Key_Backslash:
+            return SDLK_BACKSLASH;
+        case Qt::Key_BracketRight:
+            return SDLK_RIGHTBRACKET;
+        case Qt::Key_Underscore:
+            return SDLK_UNDERSCORE;
+        case Qt::Key_A:
+            return SDLK_a;
+        case Qt::Key_B:
+            return SDLK_b;
+        case Qt::Key_C:
+            return SDLK_c;
+        case Qt::Key_D:
+            return SDLK_d;
+        case Qt::Key_E:
+            return SDLK_e;
+        case Qt::Key_F:
+            return SDLK_f;
+        case Qt::Key_G:
+            return SDLK_g;
+        case Qt::Key_H:
+            return SDLK_h;
+        case Qt::Key_I:
+            return SDLK_i;
+        case Qt::Key_J:
+            return SDLK_j;
+        case Qt::Key_K:
+            return SDLK_k;
+        case Qt::Key_L:
+            return SDLK_l;
+        case Qt::Key_M:
+            return SDLK_m;
+        case Qt::Key_N:
+            return SDLK_n;
+        case Qt::Key_O:
+            return SDLK_o;
+        case Qt::Key_P:
+            return SDLK_p;
+        case Qt::Key_Q:
+            return SDLK_q;
+        case Qt::Key_R:
+            return SDLK_r;
+        case Qt::Key_S:
+            return SDLK_s;
+        case Qt::Key_T:
+            return SDLK_t;
+        case Qt::Key_U:
+            return SDLK_u;
+        case Qt::Key_V:
+            return SDLK_v;
+        case Qt::Key_W:
+            return SDLK_w;
+        case Qt::Key_X:
+            return SDLK_x;
+        case Qt::Key_Y:
+            return SDLK_y;
+        case Qt::Key_Z:
+            return SDLK_z;
+        case Qt::Key_Delete:
+            return SDLK_DELETE;
+        case Qt::Key_division:
+            return SDLK_KP_DIVIDE;
+        case Qt::Key_multiply:
+            return SDLK_KP_MULTIPLY;
+        case Qt::Key_Up:
+            return SDLK_UP;
+        case Qt::Key_Down:
+            return SDLK_DOWN;
+        case Qt::Key_Right:
+            return SDLK_RIGHT;
+        case Qt::Key_Left:
+            return SDLK_LEFT;
+        case Qt::Key_Insert:
+            return SDLK_INSERT;
+        case Qt::Key_Home:
+            return SDLK_HOME;
+        case Qt::Key_End:
+            return SDLK_END;
+        case Qt::Key_PageUp:
+            return SDLK_PAGEUP;
+        case Qt::Key_PageDown:
+            return SDLK_PAGEDOWN;
+        case Qt::Key_F1:
+            return SDLK_F1;
+        case Qt::Key_F2:
+            return SDLK_F2;
+        case Qt::Key_F3:
+            return SDLK_F3;
+        case Qt::Key_F4:
+            return SDLK_F4;
+        case Qt::Key_F5:
+            return SDLK_F5;
+        case Qt::Key_F6:
+            return SDLK_F6;
+        case Qt::Key_F7:
+            return SDLK_F7;
+        case Qt::Key_F8:
+            return SDLK_F8;
+        case Qt::Key_F9:
+            return SDLK_F9;
+        case Qt::Key_F10:
+            return SDLK_F10;
+        case Qt::Key_F11:
+            return SDLK_F11;
+        case Qt::Key_F12:
+            return SDLK_F12;
+        case Qt::Key_F13:
+            return SDLK_F13;
+        case Qt::Key_F14:
+            return SDLK_F14;
+        case Qt::Key_F15:
+            return SDLK_F15;
+        case Qt::Key_NumLock:
+            return SDLK_NUMLOCK;
+        case Qt::Key_CapsLock:
+            return SDLK_CAPSLOCK;
+        case Qt::Key_ScrollLock:
+            return SDLK_SCROLLOCK;
+        case Qt::Key_Shift:
+            return SDLK_LSHIFT;
+        case Qt::Key_Control:
+            return SDLK_LCTRL;
+        case Qt::Key_Alt:
+            return SDLK_LALT;
+        case Qt::Key_Meta:
+            return SDLK_LMETA;
+        case Qt::Key_Super_L:
+            return SDLK_LSUPER;
+        case Qt::Key_Super_R:
+            return SDLK_RSUPER;
+        case Qt::Key_Mode_switch:
+            return SDLK_MODE;
+      case Qt::Key_Help:
+            return SDLK_HELP;
+        case Qt::Key_Print:
+            return SDLK_PRINT;
+        case Qt::Key_SysReq:
+            return SDLK_SYSREQ;
+        case Qt::Key_nobreakspace:
+            return SDLK_BREAK;
+        case Qt::Key_Menu:
+            return SDLK_MENU;
+        default:
+            return SDLK_UNKNOWN;
+    }   
 }
 
 void SDL_QWin::keyEvent(bool pressed, QKeyEvent *e) {
-  static int arrowCodes[4][3] = { // arrow keys remapped according to screen rotation
-    {SDLK_LEFT, SDLK_UP, SDLK_DOWN}, //   Left
-    {SDLK_RIGHT, SDLK_DOWN, SDLK_UP}, //  Right
-    {SDLK_UP, SDLK_RIGHT, SDLK_LEFT}, //  Up
-    {SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT}, // Down
-  };
-
-  SDL_keysym keysym;
-  int scancode;
-
-  switch (e->key()) {
-    case Qt::Key_Left:
-      scancode = arrowCodes[0][rotationMode];
-      break;
-    case Qt::Key_Right:
-      scancode = arrowCodes[1][rotationMode];
-      break;
-    case Qt::Key_Up:
-      scancode = arrowCodes[2][rotationMode];
-      break;
-    case Qt::Key_Down:
-      scancode = arrowCodes[3][rotationMode];
-      break;
-
-    case Qt::Key_VolumeUp:
-      scancode = SDLK_PLUS;
-      break;
-    case Qt::Key_VolumeDown:
-      scancode = SDLK_MINUS;
-      break;
-
-    case Qt::Key_Return: // for debugging
-    case Qt::Key_Select:
-      scancode = SDLK_RETURN;
-      break;
-    case Qt::Key_Hangup:
-      scancode = SDLK_ESCAPE;
-      break;
-    case Qt::Key_Call:
-      scancode = SDLK_SPACE;
-      break;
-
-    case Qt::Key_F4: // Camera
-      scancode = SDLK_PAUSE;
-      break;
-    case Qt::Key_F7: // VR
-      scancode = SDLK_PAUSE;
-      break;
-    // TODO: Add more keys here
-
-    default:
-      return; // Ignore this key
-  }
-
-  keysym.sym = static_cast<SDLKey>(scancode);
-  keysym.scancode = scancode;
-  keysym.unicode = 0;
+          
+  SDL_keysym k;
+  k.sym = qToSDLKey(e->key(), e->text());
+  k.scancode = (Uint8)(e->nativeScanCode());
+  k.unicode = 0;
+  k.mod = qToSDLMod(e->modifiers());
+  
+//  qDebug() << "SDL_QWin::keyEvent pressed=" << pressed << ", e->key()=" << e->key() << ",e->text()=" << e->text()
+//            << "k.sym=" << k.sym << ", k.scancode=" << k.scancode << ", k.mod=" << k.mod;
+  
   if (pressed)
-    SDL_PrivateKeyboard(SDL_PRESSED, &keysym);
+    SDL_PrivateKeyboard(SDL_PRESSED, &k);
   else
-    SDL_PrivateKeyboard(SDL_RELEASED, &keysym);
-
+    SDL_PrivateKeyboard(SDL_RELEASED, &k);
 }

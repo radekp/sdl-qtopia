@@ -206,7 +206,6 @@ extern "C" {
       char *argv[1];
       argv[0] = strdup("sdlapp"); 
       app = new QtopiaApplication( argc, argv );
-      printf("QT_VideoInit\n");
       
     /* Initialize the EzX Application  */
     /* Determine the screen depth */
@@ -395,7 +394,7 @@ extern "C" {
     QRegion region;
     for (int i=0; i<numrects; ++i )
       region += QRect(rects[i].x, rects[i].y, rects[i].w, rects[i].h);
-    SDL_Win->update(region);
+    SDL_Win->flushRegion(region);
   }
   /* Is the system palette settable? */
   int QT_SetColors(_THIS, int firstcolor, int ncolors, SDL_Color *colors) {
