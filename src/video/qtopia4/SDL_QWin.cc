@@ -46,7 +46,8 @@
 
 SDL_QWin::SDL_QWin(QWidget * parent, Qt::WindowFlags f)
   : QMainWindow(parent, f), 
-  rotationMode(NoRotation), backBuffer(NULL), useRightMouseButton(false)
+  rotationMode(NoRotation), backBuffer(NULL), useRightMouseButton(false),
+  keyboardShown(false), redrawEnabled(true)
 {
   setAttribute(Qt::WA_NoSystemBackground);
   setAttribute(Qt::WA_OpaquePaintEvent);
@@ -62,6 +63,24 @@ void SDL_QWin::setBackBuffer(SDL_QWin::Rotation new_rotation, QImage *new_buffer
   backBuffer = new_buffer;
 }
 
+void SDL_QWin::toggleKeyboard()
+{
+    keyboardShown = !keyboardShown;
+    if(keyboardShown)
+        QtopiaApplication::showInputMethod();
+    else
+        QtopiaApplication::hideInputMethod();
+}
+
+void SDL_QWin::enableRedraw()
+{
+    redrawEnabled = true;
+}
+
+void SDL_QWin::disableRedraw()
+{
+    redrawEnabled = false;
+}
 
 // Show widget in full screen
 void SDL_QWin::showOnFullScreen()
@@ -147,9 +166,18 @@ void SDL_QWin::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void SDL_QWin::flushRegion(const QRegion &region) {
-        
-    if(backBuffer)
-        QScreen::instance()->blit(*backBuffer, QPoint(0,0), QRegion(0, 0, 640, 480));
+
+    if(backBuffer == NULL)
+        return;
+    
+    if(keyboardShown) {
+        QPainter p(this);
+        p.drawImage(x(), y(), *backBuffer);
+        return;
+    }
+    
+    if(redrawEnabled)
+        QScreen::instance()->blit(*backBuffer, pos(), QRegion(geometry()));
 }
 
 // This paints the current buffer to the screen, when desired.

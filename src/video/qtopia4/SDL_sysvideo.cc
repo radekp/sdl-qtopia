@@ -227,11 +227,18 @@ extern "C" {
     /* Create the window / widget */
     SDL_Win = new SDL_QWin();
     QtopiaApplication::instance()->setMainWidget(SDL_Win);
-    SDL_Win->setGeometry(0, 200, 200, 200);
-    SDL_Win->showOnFullScreen();
+    //SDL_Win->setGeometry(0, 100, 640, 380);
+    SDL_Win->showMaximized();
+    SDL_Win->setFocus();
+    SDL_Win->raise();
     
     QMenu *menu = QSoftMenuBar::menuFor(SDL_Win);
-    menu->addAction("Launch", SDL_Win, SLOT(showOnFullScreen()));
+    menu->addAction("Fullscreen", SDL_Win, SLOT(showOnFullScreen()));
+    menu->addAction("Toggle keyboard", SDL_Win, SLOT(toggleKeyboard()));
+    menu->show();
+    menu->hide();
+    QObject::connect(menu, SIGNAL(aboutToShow()), SDL_Win, SLOT(disableRedraw()));
+    QObject::connect(menu, SIGNAL(aboutToHide()), SDL_Win, SLOT(enableRedraw()));
 
     /* Fill in some window manager capabilities */
     _this->info.wm_available = 0;
@@ -394,7 +401,11 @@ extern "C" {
     QRegion region;
     for (int i=0; i<numrects; ++i )
       region += QRect(rects[i].x, rects[i].y, rects[i].w, rects[i].h);
-    SDL_Win->flushRegion(region);
+    
+    if(SDL_Win->keyboardShown)
+        SDL_Win->update(region);
+    else
+        SDL_Win->flushRegion(region);
   }
   /* Is the system palette settable? */
   int QT_SetColors(_THIS, int firstcolor, int ncolors, SDL_Color *colors) {

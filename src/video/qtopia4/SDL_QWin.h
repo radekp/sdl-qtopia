@@ -67,6 +67,9 @@ public:
 
 public slots:
    void showOnFullScreen();
+   void toggleKeyboard();
+   void enableRedraw();
+   void disableRedraw();
 
 protected:
   /* Handle resizing of the window */
@@ -99,6 +102,9 @@ private:
    * SDL needs to know current mouse position sometimes
    */
   QPoint mousePosition;
+public:
+  bool keyboardShown;
+  bool redrawEnabled;
   };
 
 #endif /* _SDL_QWin_h */

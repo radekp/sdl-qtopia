@@ -1,7 +1,7 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'SDL_QWin.h'
 **
-** Created: Tue Dec 4 21:05:02 2012
+** Created: Tue Dec 4 22:32:53 2012
 **      by: The Qt Meta Object Compiler version 62 (Qt 4.7.4)
 **
 ** WARNING! All changes made in this file will be lost!
@@ -23,7 +23,7 @@ static const uint qt_meta_data_SDL_QWin[] = {
        5,       // revision
        0,       // classname
        0,    0, // classinfo
-       1,   14, // methods
+       4,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
@@ -32,12 +32,17 @@ static const uint qt_meta_data_SDL_QWin[] = {
 
  // slots: signature, parameters, type, tag, flags
        9,   28,   28,   28, 0x0a,
+      29,   28,   28,   28, 0x0a,
+      46,   28,   28,   28, 0x0a,
+      61,   28,   28,   28, 0x0a,
 
        0        // eod
 };
 
 static const char qt_meta_stringdata_SDL_QWin[] = {
     "SDL_QWin\0showOnFullScreen()\0\0"
+    "toggleKeyboard()\0enableRedraw()\0"
+    "disableRedraw()\0"
 };
 
 const QMetaObject SDL_QWin::staticMetaObject = {
@@ -70,9 +75,12 @@ int SDL_QWin::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_c == QMetaObject::InvokeMetaMethod) {
         switch (_id) {
         case 0: showOnFullScreen(); break;
+        case 1: toggleKeyboard(); break;
+        case 2: enableRedraw(); break;
+        case 3: disableRedraw(); break;
         default: ;
         }
-        _id -= 1;
+        _id -= 4;
     }
     return _id;
 }
