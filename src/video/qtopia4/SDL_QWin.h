@@ -29,6 +29,7 @@
 #include <QMainWindow>
 #include <QDirectPainter>
 #include <QMatrix>
+#include <QtScript/QScriptEngine>
 
 #include "SDL_events.h"
 
@@ -103,8 +104,12 @@ private:
    */
   QPoint mousePosition;
 public:
+  bool debug;
   bool keyboardShown;
   bool redrawEnabled;
+  SDL_keysym pressedKey;
+  QScriptEngine scriptEngine;
+  QScriptValue scriptFun;
   };
 
 #endif /* _SDL_QWin_h */

@@ -1,6 +1,7 @@
 /*
     SDL - Simple DirectMedia Layer
     Copyright (C) 1997-2006 Sam Lantinga
+    Copyright (C) 2012 Radek Polak
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -47,10 +48,31 @@
 SDL_QWin::SDL_QWin(QWidget * parent, Qt::WindowFlags f)
   : QMainWindow(parent, f), 
   rotationMode(NoRotation), backBuffer(NULL), useRightMouseButton(false),
-  keyboardShown(false), redrawEnabled(true)
+  keyboardShown(false), redrawEnabled(true), scriptEngine(this), scriptFun()
 {
   setAttribute(Qt::WA_NoSystemBackground);
   setAttribute(Qt::WA_OpaquePaintEvent);
+
+  debug = getenv("SDL_QT_DEBUG");
+  
+  const char *scriptFile = getenv("SDL_QT_SCRIPT");
+  if(scriptFile) {
+      if(debug)
+        qDebug() << "using script file" << scriptFile;
+
+      QFile f(scriptFile);
+      if(f.open(QFile::ReadOnly)) {
+          QByteArray scriptText = f.readAll();
+          f.close();
+          scriptFun = scriptEngine.evaluate(scriptText);
+          if(!scriptFun.isValid())
+              qWarning() << "script is not valid function" << scriptFun.toString();
+      } else {
+          qWarning() << "failed to open script file" << f.errorString();
+      }
+  }
+  
+  pressedKey.sym = SDLK_UNKNOWN;
 }
 
 SDL_QWin::~SDL_QWin() {
@@ -148,6 +170,29 @@ void SDL_QWin::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void SDL_QWin::mousePressEvent(QMouseEvent *e) {
+   
+  // Emulate keys using mouse press and javascipt
+  if(scriptFun.isValid()) {
+    QScriptValueList args;
+    args << e->x() << e->y() << width() << height();
+    if(debug)
+        qDebug() << "calling script x=" << e->x() << ", y=" << e->y() << ", w=" << width() << ", h=" << height();
+    
+    QScriptValue scriptRes = scriptFun.call(QScriptValue(), args);
+    if(scriptRes.toBool()) {
+        
+        pressedKey.sym = (SDLKey) scriptEngine.globalObject().property("sym").toInt32();
+        pressedKey.scancode = (Uint8)(scriptEngine.globalObject().property("scancode").toInt32());
+        pressedKey.unicode = 0;
+        pressedKey.mod = (SDLMod)(scriptEngine.globalObject().property("mod").toInt32());
+        
+        if(debug)
+            qDebug() << "emualting key sym=" << pressedKey.sym << ", scancode=" << pressedKey.scancode << ", mod=" << pressedKey.mod;
+       
+        SDL_PrivateKeyboard(SDL_PRESSED, &pressedKey);
+    }
+  }
+    
   mouseMoveEvent(e);
   if (useRightMouseButton)
     pressedButton = Qt::RightButton;
@@ -160,6 +205,13 @@ void SDL_QWin::mousePressEvent(QMouseEvent *e) {
 }
 
 void SDL_QWin::mouseReleaseEvent(QMouseEvent *e) {
+
+    if(pressedKey.sym != SDLK_UNKNOWN)
+    {
+        SDL_PrivateKeyboard(SDL_RELEASED, &pressedKey);
+        return;
+    }
+    
   mousePosition = e->globalPos();
   SDL_PrivateMouseButton(SDL_RELEASED, (pressedButton==Qt::LeftButton)?SDL_BUTTON_LEFT:SDL_BUTTON_RIGHT,
      mousePosition.x(), mousePosition.y());
@@ -439,8 +491,8 @@ void SDL_QWin::keyEvent(bool pressed, QKeyEvent *e) {
   k.unicode = 0;
   k.mod = qToSDLMod(e->modifiers());
   
-//  qDebug() << "SDL_QWin::keyEvent pressed=" << pressed << ", e->key()=" << e->key() << ",e->text()=" << e->text()
-//            << "k.sym=" << k.sym << ", k.scancode=" << k.scancode << ", k.mod=" << k.mod;
+  if(debug)
+    qDebug() << "SDL_QWin::keyEvent pressed=" << pressed << ", e->key()=" << e->key() << ",e->text()=" << e->text() << "k.sym=" << k.sym << ", k.scancode=" << k.scancode << ", k.mod=" << k.mod;
   
   if (pressed)
     SDL_PrivateKeyboard(SDL_PRESSED, &k);

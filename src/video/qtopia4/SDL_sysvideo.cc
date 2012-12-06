@@ -228,7 +228,11 @@ extern "C" {
     SDL_Win = new SDL_QWin();
     QtopiaApplication::instance()->setMainWidget(SDL_Win);
     //SDL_Win->setGeometry(0, 100, 640, 380);
-    SDL_Win->showMaximized();
+    
+    if(getenv("SDL_QT_FS"))    
+        SDL_Win->showOnFullScreen();
+    else
+        SDL_Win->showMaximized();
     SDL_Win->setFocus();
     SDL_Win->raise();
     
