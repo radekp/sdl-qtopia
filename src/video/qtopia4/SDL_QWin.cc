@@ -39,6 +39,8 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QScreen>
+#include <QMenu>
+#include <QSoftMenuBar>
 #include <QDesktopWidget>
 #include <QApplication>
 #include <QtopiaApplication>
@@ -48,7 +50,8 @@
 SDL_QWin::SDL_QWin(QWidget * parent, Qt::WindowFlags f)
   : QMainWindow(parent, f), 
   rotationMode(NoRotation), backBuffer(NULL), useRightMouseButton(false),
-  keyboardShown(false), redrawEnabled(true), scriptEngine(this), scriptFun()
+  keyboardShown(false), redrawEnabled(true), scriptEngine(this), scriptFun(),
+  windowDeactivated(false)
 {
   setAttribute(Qt::WA_NoSystemBackground);
   setAttribute(Qt::WA_OpaquePaintEvent);
@@ -118,7 +121,11 @@ bool SDL_QWin::event(QEvent *event)
     // Needed for QtMoko fullscreen
     if(event->type() == QEvent::WindowDeactivate)
     {
+        windowDeactivated = true;
         lower();
+        QMenu *menu = QSoftMenuBar::menuFor(this);
+        menu->show();
+        menu->hide();
     }
     else if(event->type() == QEvent::WindowActivate)
     {
@@ -171,6 +178,11 @@ void SDL_QWin::mouseMoveEvent(QMouseEvent *e) {
 
 void SDL_QWin::mousePressEvent(QMouseEvent *e) {
    
+  if(windowDeactivated) {
+      windowDeactivated = false;
+      return;
+  }
+    
   // Emulate keys using mouse press and javascipt
   if(scriptFun.isValid()) {
     QScriptValueList args;
@@ -222,7 +234,7 @@ void SDL_QWin::flushRegion(const QRegion &region) {
     if(backBuffer == NULL)
         return;
     
-    if(keyboardShown) {
+    if(keyboardShown || windowDeactivated) {
         QPainter p(this);
         p.drawImage(geometry(), *backBuffer, backBuffer->rect());
         return;

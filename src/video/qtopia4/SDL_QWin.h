@@ -107,6 +107,7 @@ public:
   bool debug;
   bool keyboardShown;
   bool redrawEnabled;
+  bool windowDeactivated;
   SDL_keysym pressedKey;
   QScriptEngine scriptEngine;
   QScriptValue scriptFun;
